@@ -1,4 +1,4 @@
-# CSCI3235 Midterm 1 — Hospital Courier Robot with SARSA
+# Hospital Courier Robot with SARSA
 
 A delivery robot learns a safe route through a slippery 5×5 hospital floor with tabular SARSA.
 It is compared with a random baseline, a fixed shortest-path rule, and value iteration (a model-based reference).
@@ -37,22 +37,22 @@ Running the script twice produces identical numbers.
 
 ## Hyperparameters
 
-| Parameter | Value |
-|---|---|
-| alpha (step size) | 0.1 |
-| gamma (discount) | 0.99 |
-| epsilon (exploration) | 0.1; the study also uses 0.01 and 0.3 |
-| training episodes per seed | 1000 |
-| evaluation episodes per seed | 200 (greedy, no learning) |
-| slip probability | 0.1 |
-| time limit | 100 steps |
+| Parameter                    | Value                                 |
+| ---------------------------- | ------------------------------------- |
+| alpha (step size)            | 0.1                                   |
+| gamma (discount)             | 0.99                                  |
+| epsilon (exploration)        | 0.1; the study also uses 0.01 and 0.3 |
+| training episodes per seed   | 1000                                  |
+| evaluation episodes per seed | 200 (greedy, no learning)             |
+| slip probability             | 0.1                                   |
+| time limit                   | 100 steps                             |
 
 ## Files
 
-| File | Contents |
-|---|---|
-| `env.py` | `CourierGrid` environment: map, slip, rewards, time limit, and the model used by value iteration |
-| `agents.py` | Random and shortest-path baselines, SARSA training, value iteration, evaluation |
-| `run_experiments.py` | All experiments, the results table, and the figures |
-| `report/report.pdf` | The report, with the learning record as the last page |
-| `requirements.txt` | Dependencies |
+| File                   | Contents                                                                                           |
+| ---------------------- | -------------------------------------------------------------------------------------------------- |
+| `env.py`             | `CourierGrid` environment: map, slip, rewards, time limit, and the model used by value iteration |
+| `agents.py`          | Random and shortest-path baselines, SARSA training, value iteration, evaluation                    |
+| `run_experiments.py` | All experiments, the results table, and the figures                                                |
+| `report/report.pdf`  | The report, with the learning record as the last page                                              |
+| `requirements.txt`   | Dependencies                                                                                       |
