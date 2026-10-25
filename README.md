@@ -56,4 +56,3 @@ Running the script twice produces identical numbers.
 | `run_experiments.py` | All experiments, the results table, and the figures |
 | `report/report.pdf` | The report, with the learning record as the last page |
 | `requirements.txt` | Dependencies |
-# courier-robot
