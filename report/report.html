@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CSCI3235 Midterm 1 Report</title>
+<style>
+  @page { size: A4; margin: 15mm 17mm; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 10pt; line-height: 1.38; color: #111; background: #fff; }
+  h1 { font-size: 15pt; margin: 0 0 2px; }
+  h2 { font-size: 12pt; margin: 12px 0 4px; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
+  h3 { font-size: 10.5pt; margin: 8px 0 2px; }
+  p { margin: 3px 0 5px; }
+  ul { margin: 2px 0 5px; padding-left: 18px; }
+  li { margin: 1px 0; }
+  .meta { color: #444; margin-bottom: 8px; }
+  table { border-collapse: collapse; margin: 4px 0 6px; font-size: 9pt; }
+  th, td { border: 1px solid #bbb; padding: 2px 6px; text-align: left; }
+  th { background: #eef2f7; }
+  td.n { text-align: right; font-variant-numeric: tabular-nums; }
+  figure { margin: 6px 0; text-align: center; break-inside: avoid; }
+  figure img { max-width: 100%; }
+  figcaption { font-size: 8.5pt; color: #333; text-align: left; }
+  .eq { text-align: center; font-family: "Cambria Math", "Times New Roman", serif; font-size: 11.5pt; margin: 6px 0; }
+  .fill { background: #fff3a0; }
+  .page { break-before: page; }
+  .small { font-size: 9pt; }
+  code { font-size: 9pt; }
+</style>
+</head>
+<body>
+
+<h1>Learning a Safe Delivery Route for a Hospital Courier Robot with SARSA</h1>
+<div class="meta">Mukhamedali Daniyaruly · Student ID: 23B031269 · Course: CSCI3235 Reinforcement Learning (Midterm I take-home project) · October 2026</div>
+
+<h2>1. Problem and RL suitability</h2>
+<p><b>Task.</b> A small courier robot delivers medicine on one hospital floor, from the pharmacy (S) to a ward (G). The floor is a 5×5 grid of cells. Four cells have a wet floor (H). The floor is slippery: with probability 0.1 the robot moves sideways instead of where it intended. If the robot enters a wet cell, it falls, receives a large penalty and must restart from the pharmacy. <b>Decision-maker:</b> the robot's navigation controller, which chooses one move (up, right, down, left) at every step. <b>Desired outcome:</b> reach the ward in as few steps as possible while avoiding wet cells.</p>
+<p><b>Why the decisions are sequential.</b> Each move changes the robot's position, and the position determines which moves are safe and how far the goal is. One bad move next to a wet cell undoes all earlier progress. The goal reward arrives only at the end, so the robot has to assign credit to early moves that made the later success possible. <b>What must be learned from experience:</b> the robot is not given the slip probability or the hazard locations. Through trial and error it must learn how good each move is in each cell over the long run, the action value Q(s, a).</p>
+<p><b>Non-RL alternative.</b> If the map, the hazards and the slip probability are known exactly, dynamic programming (value iteration) or a planner such as A* computes the optimal route directly, without any trial and error. I implement value iteration as a reference (Section 5). That approach is preferable when an accurate model exists or when mistakes are expensive, because a real robot should not fall hundreds of times while learning. RL is useful when the model is unknown or changes (a new wet area, a different floor), and experience can be collected safely, for example in a simulator like this one.</p>
+<p><b>Application link.</b> I am interested in ML for healthcare. Hospital logistics, such as moving medicine and samples between wards, is a real sequential decision problem under uncertainty. This prototype is a deliberately tiny, simulated version of it.</p>
+
+<h2>2. MDP formulation</h2>
+<table>
+<tr><th>Element</th><th>Definition</th></tr>
+<tr><td>State <i>S</i></td><td>Robot cell (row, col), 25 cells and states 0–24. G is terminal. H cells are never occupied, because entering one teleports the robot to S. That leaves 20 decision states.</td></tr>
+<tr><td>Actions <i>A</i></td><td>{up, right, down, left} in every state.</td></tr>
+<tr><td>Transitions</td><td>The robot moves in the intended direction with probability 0.9 and in each perpendicular direction with probability 0.05. Moving into a wall leaves it in place. Entering H sends it to S. Entering G ends the episode.</td></tr>
+<tr><td>Reward <i>R</i></td><td>−1 per step (time cost). +10 when entering G, instead of −1. −10 when entering H, together with the reset to S.</td></tr>
+<tr><td>Start / end</td><td>Start at S = (4,0). The episode terminates at G = (0,4) or is truncated after 100 steps (time limit).</td></tr>
+<tr><td>Discount γ</td><td>0.99. Episodes are short (an optimal route takes about 9 steps, and 0.99<sup>9</sup> ≈ 0.91), so the goal reward 9 steps ahead keeps almost its full weight. The −1 step cost, not γ, is what pushes the robot toward short routes. γ &lt; 1 also keeps values finite for policies that never reach G.</td></tr>
+</table>
+<p><b>Deterministic or stochastic.</b> The environment is <i>stochastic</i> because of the slip. The behaviour policy during training is stochastic (ε-greedy). The evaluated policy is deterministic (greedy) except for random tie-breaking. The task is <i>episodic</i>.</p>
+<p><b>Markov assumption.</b> In the simulator the next cell and the reward depend only on the current cell and the action, not on how the robot got there, so the cell is a Markov state for the movement dynamics. The state is an approximation in one respect: the elapsed time <i>t</i> is not part of the state, while the 100-step limit depends on it. Near the limit, the optimal action could in principle depend on how many steps remain. Optimal routes need about 9–10 steps, far below 100, so the effect is negligible here. A real robot would also lack information that a cell index does not capture, such as its heading, moving people, and whether a floor is drying.</p>
+<p><b>Transition examples</b> (Figure 1a). (i) <i>s</i> = (4,0), <i>a</i> = right, no slip (p = 0.9) → <i>r</i> = −1, <i>s'</i> = (4,1). (ii) <i>s</i> = (4,1), <i>a</i> = up, no slip → the robot enters H at (3,1) → <i>r</i> = −10, <i>s'</i> = (4,0) = S, and the episode continues.</p>
+<figure>
+  <img src="../figures/fig1_environment_policy.png" style="width: 100%;">
+  <figcaption><b>Figure 1.</b> (a) Map: S start (pharmacy), G goal (ward), H wet floor, with one transition. (b) Greedy policy learned by SARSA (seed 0, ε = 0.1). (c) Optimal policy from value iteration, which uses the true model. Arrows show argmax<sub>a</sub> Q(s, a).</figcaption>
+</figure>
+
+<h2>3. Method and update rule</h2>
+<p>I use <b>SARSA</b>, an on-policy temporal-difference control method (Sutton &amp; Barto, Sec. 6.4). After every step the agent updates</p>
+<div class="eq">Q(S<sub>t</sub>, A<sub>t</sub>) ← Q(S<sub>t</sub>, A<sub>t</sub>) + α [ R<sub>t+1</sub> + γ Q(S<sub>t+1</sub>, A<sub>t+1</sub>) − Q(S<sub>t</sub>, A<sub>t</sub>) ]</div>
+<ul>
+  <li><b>Q(S<sub>t</sub>, A<sub>t</sub>)</b> is the current estimate of the expected discounted return when the agent takes action A<sub>t</sub> in cell S<sub>t</sub> and then keeps following its current policy.</li>
+  <li><b>R<sub>t+1</sub></b> is the reward just received (−1, +10 or −10).</li>
+  <li><b>γ Q(S<sub>t+1</sub>, A<sub>t+1</sub>)</b> is the discounted estimate of everything that comes after, using the action A<sub>t+1</sub> the agent <i>actually chose</i> in the next cell. That choice is where the name S-A-R-S-A comes from, and it is what makes the method on-policy.</li>
+  <li><b>R<sub>t+1</sub> + γ Q(S<sub>t+1</sub>, A<sub>t+1</sub>)</b> is the TD target, a one-step guess of the true return. The bracket is the <b>TD error</b>: how much better or worse things went than the agent expected.</li>
+  <li><b>α = 0.1</b> is the step size: each update moves the estimate 10% of the way toward the target. A constant α averages over the random slips.</li>
+  <li>When G is reached, the target is just R<sub>t+1</sub>, because no future follows. When the episode is cut by the time limit, the agent still bootstraps from Q(S<sub>t+1</sub>, A<sub>t+1</sub>), because the time limit is not a real end of the task.</li>
+</ul>
+<p><b>What is estimated and how it is used.</b> The table Q (25 × 4) estimates action values. During training, actions come from an <b>ε-greedy</b> policy: with probability ε a random action (exploration), otherwise argmax<sub>a</sub> Q(s, a) with random tie-breaking (exploitation). For evaluation the agent acts purely greedily (ε = 0) and does not learn. Q starts at 0. Almost all true returns are negative, so untried actions look better than tried ones, which adds exploration early on.</p>
+<p><b>Baselines.</b> (1) <i>Random</i>: a uniformly random action at every step. (2) <i>Shortest-path rule</i>: a random choice among the moves that reduce the Manhattan distance to G. This is the obvious hand-written rule, and it ignores both hazards and slip. <b>Reference:</b> value iteration on the true model, which is the non-RL alternative from Section 1. It shows how close SARSA gets to optimal, but it is not a fair competitor, because it is given the model.</p>
+
+<h2>4. Experimental setup</h2>
+<ul>
+  <li><b>Hyperparameters:</b> α = 0.1, γ = 0.99, ε = 0.1 (fixed), 1000 training episodes per run. The learning curve (Figure 2) plateaus after about 100 episodes. I train 10× longer to check that performance stays stable and does not drift. One full experiment takes about 10 s on a laptop CPU.</li>
+  <li><b>Seeds:</b> 10 independent runs, k = 0…9. Run k trains with environment and agent seed k.</li>
+  <li><b>Evaluation separate from training:</b> after training, the frozen greedy policy is run for 200 episodes with a different random stream (seed 10000 + k), without any updates. The baselines and value iteration are evaluated on exactly the same evaluation seeds.</li>
+  <li><b>Metrics:</b> undiscounted return per episode, success rate (G reached before the time limit) and episode length. For each run I average over its 200 evaluation episodes, then report the <b>mean ± standard deviation over the 10 runs</b>.</li>
+  <li><b>Parameter study:</b> ε ∈ {0.01, 0.1, 0.3}, with everything else unchanged.</li>
+  <li><b>Reproducibility:</b> Python 3.12.6, numpy 1.26.4, matplotlib 3.8.3. <code>pip install -r requirements.txt</code>, then <code>python run_experiments.py</code>. This regenerates every number and figure in this report (see README).</li>
+</ul>
+
+<h2>5. Results</h2>
+<table>
+<tr><th>Method (greedy evaluation, 10 seeds × 200 episodes)</th><th>Return</th><th>Success rate</th><th>Episode length</th></tr>
+<tr><td>Random baseline</td><td class="n">−185.34 ± 2.31</td><td class="n">0.103 ± 0.013</td><td class="n">95.5 ± 0.8</td></tr>
+<tr><td>Shortest-path rule baseline</td><td class="n">−48.90 ± 4.28</td><td class="n">0.996 ± 0.003</td><td class="n">21.8 ± 1.1</td></tr>
+<tr><td><b>SARSA (ε = 0.1)</b></td><td class="n"><b>0.38 ± 0.34</b></td><td class="n"><b>1.000 ± 0.000</b></td><td class="n"><b>9.6 ± 0.2</b></td></tr>
+<tr><td>Value iteration (knows the model; reference)</td><td class="n">0.63 ± 0.23</td><td class="n">1.000 ± 0.000</td><td class="n">9.4 ± 0.2</td></tr>
+</table>
+<p class="small"><b>Table 1.</b> Final comparison, mean ± std over 10 seeds.</p>
+
+<figure>
+  <img src="../figures/fig2_training_curve.png" style="width: 78%;">
+  <figcaption><b>Figure 2.</b> SARSA training return (ε = 0.1), 20-episode moving average. The line is the mean over 10 seeds and the band is ±1 std. Horizontal lines are the evaluation returns of the baselines and of value iteration.</figcaption>
+</figure>
+<figure>
+  <img src="../figures/fig3_final_comparison.png" style="width: 66%;">
+  <figcaption><b>Figure 3.</b> Greedy evaluation return of each method (mean ± std over 10 seeds, 200 episodes per seed).</figcaption>
+</figure>
+
+<p><b>Interpretation.</b> SARSA reaches the ward in every evaluation episode in about 9.6 steps, with return 0.38 ± 0.34. The random baseline mostly runs out of time (return −185.3, 10% success). The shortest-path rule almost always arrives (99.6%) but needs 21.8 steps and scores −48.9, because the direct diagonal route passes the wet cells (3,1), (2,2) and (1,3). It falls repeatedly and restarts. SARSA learned instead to take the safer route along the bottom row and up the right column (Figure 1b), which is the same route that value iteration finds optimal (Figure 1c). The remaining gap to value iteration (0.38 vs 0.63, about a quarter of a reward point per episode) is small compared with the run-to-run std. Across seeds, the greedy SARSA action matches the optimal action in 88.5% of the 20 decision states. The differences are in cells away from the route, such as (3,0) in Figure 1b. Those cells are rarely visited, and they do not affect return because the greedy route never enters them. Figure 2 shows that learning is fast: training return rises from about −70 to about −2 within ~100 episodes and then stays flat. Training return stays below evaluation return because 10% of the actions are random.</p>
+
+<h3>Parameter study: exploration rate ε</h3>
+<table>
+<tr><th>ε</th><th>Greedy eval return</th><th>Training return, last 100 episodes</th><th>Policy agreement with optimal</th></tr>
+<tr><td>0.01</td><td class="n">0.30 ± 0.36</td><td class="n">−0.16 ± 0.76</td><td class="n">79.0%</td></tr>
+<tr><td>0.1</td><td class="n">0.38 ± 0.34</td><td class="n">−2.01 ± 1.10</td><td class="n">88.5%</td></tr>
+<tr><td>0.3</td><td class="n">0.11 ± 0.98</td><td class="n">−10.10 ± 2.54</td><td class="n">95.0%</td></tr>
+</table>
+<p class="small"><b>Table 2.</b> Effect of ε (mean ± std over 10 seeds). Policy agreement is the fraction of the 20 decision states where the greedy SARSA action equals the value-iteration action, averaged over seeds.</p>
+<figure>
+  <img src="../figures/fig4_epsilon_study.png" style="width: 78%;">
+  <figcaption><b>Figure 4.</b> Training return for three exploration rates (mean ± std over 10 seeds, 20-episode moving average).</figcaption>
+</figure>
+<p><b>What changed and why.</b> <i>Training</i> return gets much worse as ε grows, from −0.16 to −10.10. With ε = 0.3, almost a third of the moves are random, and next to wet cells a random move often costs −10. More exploration also visits more states, so the policy agreement with the optimal policy rises from 79% to 95%. <i>Greedy evaluation</i> return, however, barely changes between ε = 0.01 and ε = 0.1 (0.30 vs 0.38, well within one std). Even ε = 0.01 learns the main route, because the zero initialisation of Q already forces early exploration. Wrong actions in rarely visited states do not matter if the greedy route never goes there. ε = 0.3 gives the lowest and the least stable evaluation return (std 0.98), which Section 6 explains.</p>
+
+<h2>6. Discussion, limitations and next step</h2>
+<p><b>A failure.</b> With ε = 0.3, seed 6 scored −2.66 in greedy evaluation, and the robot fell onto a wet cell in 15% of its evaluation episodes. The cause is a wrong choice at cell (4,3): SARSA preferred <i>up</i> (Q = −0.90) over <i>right</i> (Q = −1.81), while value iteration prefers <i>right</i>. SARSA is on-policy, so it learns the value of the policy it actually follows, including 30% random moves. It therefore picks the route that is best <i>while exploring heavily</i>, and that route need not be best when the robot later acts greedily. Constant α = 0.1 also makes the estimates noisy, because every slip shifts Q. This is the same effect as in the Cliff Walking example of Sutton &amp; Barto (Example 6.6). The lesson is that a single good run with a large ε would have been misleading, and multiple seeds exposed the failure.</p>
+<p><b>Limitations.</b> The map is tiny and fixed, so the agent memorises one floor and would not transfer to another. The rewards (−10 for a fall, +10 for delivery) are hand-picked, and a different penalty could change the preferred route. The slip model is invented. The state ignores time, people and partial observability. 1000 episodes of trial and error would be unacceptable on a real robot, so in practice the learning would happen in a simulator.</p>
+<p><b>Next step.</b> With more time I would (1) decay ε and α over training (a GLIE schedule) and test whether the ε = 0.3 failure disappears, (2) compare against Q-learning, which learns the value of the greedy policy directly, and (3) randomise the hazard positions between episodes to measure generalisation.</p>
+
+<h2>7. AI Use Statement</h2>
+<p>I used <b>Claude Code</b> (Anthropic, Claude Opus 5.5) to help write the environment, the SARSA, baseline and value-iteration code, and the plotting script, and to draft the text of this report. I chose to submit this project, read all of the code, and checked that every number in the report comes from <code>results/summary.json</code> produced by <code>run_experiments.py</code>. <b>My own verification/change:</b> <span class="fill">[WRITE WHAT YOU PERSONALLY CHECKED OR CHANGED, e.g. computed one SARSA update by hand and compared it with the code / re-ran with other seeds / changed a parameter and observed the result.]</span></p>
+
+<h2>8. References</h2>
+<ol class="small">
+  <li>R. S. Sutton and A. G. Barto, <i>Reinforcement Learning: An Introduction</i>, 2nd ed., MIT Press, 2018. Sec. 4.4 (value iteration), Sec. 6.4 (SARSA), Example 6.6 (Cliff Walking). http://incompleteideas.net/book/the-book-2nd.html</li>
+  <li>Stanford CS234: Reinforcement Learning, course materials. https://web.stanford.edu/class/cs234/</li>
+  <li>C. R. Harris et al., "Array programming with NumPy," <i>Nature</i> 585, 2020. J. D. Hunter, "Matplotlib: A 2D graphics environment," <i>CiSE</i> 9(3), 2007.</li>
+</ol>
+<p class="small">No external RL code was used. The environment was written from scratch for this project.</p>
+
+<!-- ===================== LEARNING RECORD (separate page, not counted in the 6 pages) ===================== -->
+<div class="page">
+<h2>Appendix: Learning record</h2>
+<div class="meta">Mukhamedali Daniyaruly · Student ID: 23B031269 · Course: CSCI3235 Reinforcement Learning</div>
+
+<h3>Work completed before and during the midterm week</h3>
+<table>
+<tr><th>Date / week</th><th>Activity (lab, exercise, Coursera module, notes, independent study)</th><th>Evidence</th></tr>
+<tr><td class="fill">[week]</td><td class="fill">[e.g. Lab N: multi-armed bandits, ε-greedy]</td><td class="fill">[file / link / screenshot]</td></tr>
+<tr><td class="fill">[week]</td><td class="fill">[e.g. Lab N: MDPs, Bellman equations]</td><td class="fill">[…]</td></tr>
+<tr><td class="fill">[week]</td><td class="fill">[e.g. Coursera RL Specialization, Course 1, Module X, or "no access"]</td><td class="fill">[certificate / progress screenshot]</td></tr>
+<tr><td class="fill">[week]</td><td class="fill">[e.g. Sutton &amp; Barto Ch. 6 (TD learning) read for this project]</td><td class="fill">[notes]</td></tr>
+<tr><td>Oct 19–26</td><td>This midterm project: environment, SARSA, baselines, 10-seed experiments, ε study</td><td>This report and code</td></tr>
+</table>
+
+<h3>Reflection (150–250 words)</h3>
+<p class="fill">[Write in your own words: ONE idea that became clearer (for example, why SARSA's on-policy target makes it choose safer routes while exploring, or why one good run is not evidence) and ONE idea that is still difficult (for example, how to choose ε and α schedules, or when bootstrapping is biased). It must be honest and personal: this part is graded on reflection, not on perfect English.]</p>
+</div>
+
+</body>
+</html>

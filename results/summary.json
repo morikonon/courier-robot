@@ -1,0 +1,122 @@
+{
+  "config": {
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "episodes": 1000,
+    "eval_episodes": 200,
+    "alpha": 0.1,
+    "gamma": 0.99,
+    "epsilon": 0.1,
+    "epsilon_study": [
+      0.01,
+      0.1,
+      0.3
+    ]
+  },
+  "table": {
+    "Random baseline": {
+      "return_mean": -185.3415,
+      "return_std": 2.3094415450493644,
+      "success_mean": 0.1035,
+      "success_std": 0.012658988901172164,
+      "length_mean": 95.4585,
+      "length_std": 0.7852644459034167
+    },
+    "Shortest-path rule": {
+      "return_mean": -48.902,
+      "return_std": 4.284804662992235,
+      "success_mean": 0.9964999999999999,
+      "success_std": 0.003201562118716427,
+      "length_mean": 21.820500000000003,
+      "length_std": 1.1154045230318907
+    },
+    "Value iteration (knows model)": {
+      "return_mean": 0.6335000000000001,
+      "return_std": 0.22973952642068363,
+      "success_mean": 1.0,
+      "success_std": 0.0,
+      "length_mean": 9.367500000000001,
+      "length_std": 0.1567043394421481
+    },
+    "SARSA eps=0.01": {
+      "return_mean": 0.30250000000000005,
+      "return_std": 0.3600642303811919,
+      "success_mean": 1.0,
+      "success_std": 0.0,
+      "length_mean": 9.599499999999999,
+      "length_std": 0.16511284020329833,
+      "train_last100_mean": -0.16,
+      "train_last100_std": 0.7636622289991826,
+      "policy_agreement_mean": 0.7899999999999999,
+      "per_seed_eval_return": [
+        0.425,
+        -0.235,
+        0.325,
+        0.45,
+        0.505,
+        0.435,
+        1.005,
+        0.395,
+        -0.045,
+        -0.235
+      ]
+    },
+    "SARSA eps=0.1": {
+      "return_mean": 0.382,
+      "return_std": 0.3444865744844057,
+      "success_mean": 1.0,
+      "success_std": 0.0,
+      "length_mean": 9.574000000000002,
+      "length_std": 0.16384138671288176,
+      "train_last100_mean": -2.01,
+      "train_last100_std": 1.104065215465101,
+      "policy_agreement_mean": 0.885,
+      "per_seed_eval_return": [
+        0.245,
+        0.02,
+        0.41,
+        0.595,
+        0.095,
+        0.35,
+        0.115,
+        1.115,
+        0.82,
+        0.055
+      ]
+    },
+    "SARSA eps=0.3": {
+      "return_mean": 0.1125,
+      "return_std": 0.975654267658375,
+      "success_mean": 0.9984999999999999,
+      "success_std": 0.004500000000000004,
+      "length_mean": 9.723500000000001,
+      "length_std": 0.7682253901037115,
+      "train_last100_mean": -10.096999999999998,
+      "train_last100_std": 2.5399647635351164,
+      "policy_agreement_mean": 0.95,
+      "per_seed_eval_return": [
+        0.28,
+        0.02,
+        0.14,
+        0.18,
+        0.455,
+        0.395,
+        -2.66,
+        0.58,
+        1.21,
+        0.525
+      ]
+    }
+  },
+  "optimal_V_start": -0.01417328885062398
+}
