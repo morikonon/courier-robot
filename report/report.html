@@ -121,7 +121,7 @@
 <p><b>Next step.</b> With more time I would (1) decay ε and α over training (a GLIE schedule) and test whether the ε = 0.3 failure disappears, (2) compare against Q-learning, which learns the value of the greedy policy directly, and (3) randomise the hazard positions between episodes to measure generalisation.</p>
 
 <h2>7. AI Use Statement</h2>
-<p>I used <b>Claude Code</b> (Anthropic, Claude Opus 5.5) to help write the environment, the SARSA, baseline and value-iteration code, and the plotting script, and to draft the text of this report. I chose to submit this project, read all of the code, and checked that every number in the report comes from <code>results/summary.json</code> produced by <code>run_experiments.py</code>. <b>My own verification/change:</b> <span class="fill">[WRITE WHAT YOU PERSONALLY CHECKED OR CHANGED, e.g. computed one SARSA update by hand and compared it with the code / re-ran with other seeds / changed a parameter and observed the result.]</span></p>
+<p>I used <b>Claude Code</b> (Anthropic, Claude Opus 5.5) to help write the environment, the SARSA, baseline and value-iteration code, and the plotting script, and to draft the text of this report. I chose to submit this project, read all of the code, and checked that every number in the report comes from <code>results/summary.json</code> produced by <code>run_experiments.py</code>. <b>My own verification:</b> I went through the code part by part and explained each part in my own words: the environment, the 4 actions, the rewards (−1, +10, −10), <code>reset</code> and <code>step</code>, the zero-initialised Q-table, <code>greedy_action</code>, <code>epsilon_greedy</code>, the random baseline, and the SARSA update. While doing this I found and corrected three mistakes in my own understanding. (1) I first wrote the update as Q + α(r − Q). That is only the terminal case; the full update also contains γ·Q(s′, a′). (2) I first thought SARSA uses the best next action. In fact it uses the action a′ that ε-greedy really chose, and taking the best next action (max) is what Q-learning does. (3) I first thought <code>step</code> is the agent using the Q-table. In fact <code>step</code> is the environment: the agent chooses the action, and the environment applies it and returns the next state and the reward.</p>
 
 <h2>8. References</h2>
 <ol class="small">
@@ -139,15 +139,18 @@
 <h3>Work completed before and during the midterm week</h3>
 <table>
 <tr><th>Date / week</th><th>Activity (lab, exercise, Coursera module, notes, independent study)</th><th>Evidence</th></tr>
-<tr><td class="fill">[week]</td><td class="fill">[e.g. Lab N: multi-armed bandits, ε-greedy]</td><td class="fill">[file / link / screenshot]</td></tr>
-<tr><td class="fill">[week]</td><td class="fill">[e.g. Lab N: MDPs, Bellman equations]</td><td class="fill">[…]</td></tr>
-<tr><td class="fill">[week]</td><td class="fill">[e.g. Coursera RL Specialization, Course 1, Module X, or "no access"]</td><td class="fill">[certificate / progress screenshot]</td></tr>
-<tr><td class="fill">[week]</td><td class="fill">[e.g. Sutton &amp; Barto Ch. 6 (TD learning) read for this project]</td><td class="fill">[notes]</td></tr>
+<tr><td>Before the course</td><td>Independent study: GRPO and DPO, RL-style fine-tuning of LLMs. The agent is the LLM, the action is the generated text, and training uses preferred vs. rejected answers.</td><td>Self-study (no certificate)</td></tr>
+<tr><td>From Sep 13, 2026</td><td>Coursera <i>Fundamentals of Reinforcement Learning</i> (University of Alberta, Course 1 of the RL Specialization). Completed: Module 1 (Welcome) and Module 2 (K-armed bandits). Module 3 (MDPs) in progress: most lessons done, practice assignment "MDPs" submitted with grade 83.33%; the peer-graded assignment "Describe Three MDPs" is not submitted yet. Modules 4–5 (value functions and Bellman equations, dynamic programming) not started yet. Our course did not set deadlines for Coursera, so I have been going through it slowly.</td><td>Screenshot below (taken Oct 26, 2026)</td></tr>
 <tr><td>Oct 19–26</td><td>This midterm project: environment, SARSA, baselines, 10-seed experiments, ε study</td><td>This report and code</td></tr>
 </table>
+<figure style="margin: 4px 0;">
+  <img src="coursera_progress_module3.png" style="width: 72%;">
+  <figcaption><b>Evidence.</b> My Coursera progress for <i>Fundamentals of Reinforcement Learning</i>, Oct 26, 2026: Modules 1–2 completed, Module 3 (MDPs) in progress with the practice assignment graded 83.33%, Modules 4–5 not started.</figcaption>
+</figure>
 
 <h3>Reflection (150–250 words)</h3>
-<p class="fill">[Write in your own words: ONE idea that became clearer (for example, why SARSA's on-policy target makes it choose safer routes while exploring, or why one good run is not evidence) and ONE idea that is still difficult (for example, how to choose ε and α schedules, or when bootstrapping is biased). It must be honest and personal: this part is graded on reflection, not on perfect English.]</p>
+<p><b>What became clearer.</b> Working through the Coursera course, I understood what reinforcement learning is: an agent interacts with an environment, takes actions and receives rewards, and learns from this experience instead of from labelled examples. I learned what an MDP and the Bellman equation are, that dynamic programming (value iteration) needs the full model, and that SARSA and Q-learning learn without it. Building my own environment and training an agent made this concrete. I understood that the action with the maximum Q is only the best one according to the agent's current estimate, and that with ε = 0.1 the agent takes a random action 10% of the time to explore. I also separated who does what: the agent chooses the action, and the environment's <code>step</code> returns the next state and the reward. Finally, I saw why Q-tables only work for small problems: a self-driving car has far too many situations (speed, traffic lights, other cars) for a table, so it needs a state vector and a neural network, which is deep RL.</p>
+<p><b>What is still difficult.</b> The exact difference between SARSA and Q-learning. I mixed it up more than once: I thought Q-learning chooses the optimal action, but both methods choose actions with ε-greedy. The difference is only in the update target, Q(s′, a′) for SARSA and max Q(s′, ·) for Q-learning. To understand it fully, I want to implement Q-learning on the same grid and compare the routes.</p>
 </div>
 
 </body>
